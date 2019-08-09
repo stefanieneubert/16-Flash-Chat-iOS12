@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import Firebase
 
 
 class RegisterViewController: UIViewController {
@@ -30,8 +31,18 @@ class RegisterViewController: UIViewController {
     @IBAction func registerPressed(_ sender: AnyObject) {
         
 
-        
+        if let email = emailTextfield.text, let password = passwordTextfield.text {
         //TODO: Set up a new user on our Firbase database
+            Auth.auth().createUser(withEmail: email, password: password) { (user, error) in
+                if (error != nil) {
+                    print(error!)
+                } else {
+                    print("Registration sucessful")
+                    
+                    self.performSegue(withIdentifier: "goToChat", sender: self)
+                }
+            }
+        }
         
         
 
