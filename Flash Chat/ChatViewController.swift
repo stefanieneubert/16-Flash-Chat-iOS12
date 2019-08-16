@@ -10,11 +10,11 @@ import UIKit
 import Firebase
 
 
-class ChatViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
+class ChatViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, UITextFieldDelegate {
     
     
     // Declare instance variables here
-
+    var messageArray : [Message] = [Message]()
     
     // We've pre-linked the IBOutlets
     @IBOutlet var heightConstraint: NSLayoutConstraint!
@@ -23,28 +23,25 @@ class ChatViewController: UIViewController, UITableViewDelegate, UITableViewData
     @IBOutlet var messageTableView: UITableView!
     
     
-    
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        //TODO: Set yourself as the delegate and datasource here:
+        // Set yourself as the delegate and datasource here:
         messageTableView.delegate = self
         messageTableView.dataSource = self
         
         
         
-        //TODO: Set yourself as the delegate of the text field here:
-
+        // Set yourself as the delegate of the text field here:
+        messageTextfield.delegate = self
         
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(tableViewTapped))
+        messageTableView.addGestureRecognizer(tapGesture)
         
-        //TODO: Set the tapGesture here:
-        
-        
-
-        //TODO: Register your MessageCell.xib file here:
         messageTableView.register(UINib(nibName: "MessageCell", bundle: nil), forCellReuseIdentifier: "customMessageCell")
 
         configureTableView()
+        retrieveMessages()
         
     }
 
@@ -53,30 +50,22 @@ class ChatViewController: UIViewController, UITableViewDelegate, UITableViewData
     //MARK: - TableView DataSource Methods
     
     
-    
-    //TODO: Declare cellForRowAtIndexPath here:
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "customMessageCell", for: indexPath) as! CustomMessageCell
-        let messageArray = ["First Message", "Second Message long long long long long long long long long long long long long long long long long long long long long long long long long long long long", "Third Message"]
-        cell.messageBody.text = messageArray[indexPath.row]
+        cell.messageBody.text = messageArray[indexPath.row].messageBody
+        cell.senderUsername.text = messageArray[indexPath.row].sender
+        cell.avatarImageView.image = UIImage(named: "egg")
         return cell
     }
     
-    
-    
-    //TODO: Declare numberOfRowsInSection here:
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return 3
+        return messageArray.count
     }
     
+    @objc func tableViewTapped() {
+        messageTextfield.endEditing(true)
+    }
     
-    
-    
-    //TODO: Declare tableViewTapped here:
-    
-    
-    
-    //TODO: Declare configureTableView here:
     func configureTableView() {
         messageTableView.rowHeight = UITableView.automaticDimension
         messageTableView.estimatedRowHeight = 120
@@ -88,16 +77,22 @@ class ChatViewController: UIViewController, UITableViewDelegate, UITableViewData
     
     //MARK:- TextField Delegate Methods
     
+    func textFieldDidBeginEditing(_ textField: UITextField) {
+        
+        UIView.animate(withDuration: 0.5){ // trailing closure
+                // if keyboard pops uo, move textfield 258px up (keyboard is 258px high)
+                self.heightConstraint.constant = 348
+                self.view.layoutIfNeeded() // redraw the view
+            }
+    }
     
-
-    
-    //TODO: Declare textFieldDidBeginEditing here:
-    
-    
-    
-    
-    //TODO: Declare textFieldDidEndEditing here:
-    
+    func textFieldDidEndEditing(_ textField: UITextField) {
+        
+        UIView.animate(withDuration: 0.5){
+            self.heightConstraint.constant = 50
+            self.view.layoutIfNeeded()
+        }
+    }
 
     
     ///////////////////////////////////////////
@@ -105,21 +100,46 @@ class ChatViewController: UIViewController, UITableViewDelegate, UITableViewData
     
     //MARK: - Send & Recieve from Firebase
     
-    
-    
-    
-    
     @IBAction func sendPressed(_ sender: AnyObject) {
+        messageTextfield.endEditing(true)
+        messageTextfield.isEnabled = false
+        sendButton.isEnabled = false
         
-        
-        //TODO: Send the message to Firebase and save it in our database
-        
+        // Send the message to Firebase and save it in our database
+        let messagesDB = Database.database().reference().child("Messages")
+        let messageDictionary = [
+            "Sender": Auth.auth().currentUser?.email,
+            "MessageBody": messageTextfield.text!
+        ]
+        // save messageDictionary in DB under an automatically generated unique identifier
+        messagesDB.childByAutoId().setValue(messageDictionary) {
+            (error, reference) in
+            if (error != nil) {
+                print(error!)
+            } else {
+                print("Message saved")
+                self.messageTextfield.text = ""
+                self.messageTextfield.isEnabled = true
+                self.sendButton.isEnabled = true
+            }
+        }
         
     }
     
-    //TODO: Create the retrieveMessages method here:
-    
-    
+    func retrieveMessages() {
+        let messageDB = Database.database().reference().child("Messages")
+        messageDB.observe(.childAdded) { (snapshot) in
+            let snapshotValue: Dictionary = snapshot.value as! Dictionary<String, String> // convert the Any? datatype to a Dictionary
+            let text = snapshotValue["MessageBody"]
+            let sender = snapshotValue["Sender"]
+            let message = Message()
+            message.sender = sender!
+            message.messageBody = text!
+            self.messageArray.append(message)
+            self.configureTableView() // reformat the whole view
+            self.messageTableView.reloadData()
+        }
+    }
 
     
     
@@ -132,8 +152,7 @@ class ChatViewController: UIViewController, UITableViewDelegate, UITableViewData
         } catch {
             print("Error signing out")
         }
-        
-        
+  
     }
     
 
